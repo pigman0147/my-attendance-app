@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>รายชื่อพนักงาน</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn-back { display: inline-block; padding: 10px 20px; background: #666; color: white; text-decoration: none; border-radius: 5px; }
+        .btn-del { background: #ff4444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; text-decoration: none; }
+        .role-admin { color: blue; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>👥 รายชื่อพนักงานทั้งหมด</h1>
+        <a href="/admin" class="btn-back">⬅️ กลับไปหน้า Dashboard</a>
+    </div>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>ตำแหน่ง</th>
+            <th>จัดการ</th>
+        </tr>
+        <% users.forEach(function(user) { %>
+            <tr>
+                <td><%= user.id %></td>
+                <td><%= user.username %></td>
+                <td><%= user.name %></td>
+                <td class="<%= user.role === 'admin' ? 'role-admin' : '' %>">
+                    <%= user.role.toUpperCase() %>
+                </td>
+                <td>
+                    <% if (user.id !== currentUserId) { %> 
+                        <a href="/admin/delete-user/<%= user.id %>" class="btn-del" onclick="return confirm('ยืนยันที่จะลบ <%= user.name %> ออกจากระบบ?')">🗑️ ลบ</a>
+                    <% } else { %>
+                        <span style="color:#ccc;">(คุณ)</span>
+                    <% } %>
+                </td>
+            </tr>
+        <% }); %>
+    </table>
+</body>
+</html>

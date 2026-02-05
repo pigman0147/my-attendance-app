@@ -1,22 +1,40 @@
 <!DOCTYPE html>
 <html>
-<head><title>Check In</title></head>
+<head><title>Check In/Out</title></head>
 <body style="text-align:center; padding-top:50px; font-family:sans-serif;">
     <h1>สวัสดีคุณ <%= name %> 👋</h1>
     
-    <% if (message) { %>
-        <div style="background:#dff0d8; color:green; padding:10px; margin-bottom:20px;">
-            <%= message %>
-        </div>
-    <% } %>
+    <div style="margin: 20px auto; width: 300px; padding: 20px; border: 1px solid #ccc; border-radius: 10px;">
+        
+        <% if (workState === 'WAIT_CHECKIN') { %>
+            <h3>🟡 ยังไม่ได้ลงเวลาเข้างาน</h3>
+            <form action="/do-checkin" method="post">
+                <button type="submit" style="padding:15px 30px; font-size:18px; background-color:#28a745; color:white; border:none; cursor:pointer; border-radius:5px;">
+                    👉 ลงเวลาเข้างาน
+                </button>
+            </form>
 
-    <form action="/do-checkin" method="post">
-        <button type="submit" style="padding:30px 50px; font-size:24px; background-color:#28a745; color:white; border:none; cursor:pointer; border-radius:10px;">
-            👉 กดปุ่มนี้เพื่อลงเวลาเข้างาน
-        </button>
-    </form>
+        <% } else if (workState === 'WORKING') { %>
+            <h3 style="color:green;">🟢 เข้างานแล้วเมื่อ: <%= record.check_in_time %></h3>
+            <p>สถานะ: <%= record.status %></p>
+            <hr>
+            <form action="/do-checkout" method="post">
+                <button type="submit" style="padding:15px 30px; font-size:18px; background-color:#ffc107; color:black; border:none; cursor:pointer; border-radius:5px;">
+                    🏃‍♂️ ลงเวลาออกงาน
+                </button>
+            </form>
+
+        <% } else { %>
+            <h3 style="color:blue;">🔵 ลงเวลาครบแล้ว</h3>
+            <p>เข้า: <%= record.check_in_time %></p>
+            <p>ออก: <%= record.check_out_time %></p>
+            <p>สรุป: <strong><%= record.status %></strong></p>
+            <button disabled style="padding:10px; background-color:#ccc; border:none;">กลับบ้านได้</button>
+        <% } %>
+
+    </div>
     
-    <br><br>
+    <br>
     <a href="/logout" style="color:#666;">ออกจากระบบ</a>
 </body>
 </html>

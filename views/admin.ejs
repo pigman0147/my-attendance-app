@@ -3,44 +3,109 @@
 <head>
     <title>Admin Dashboard</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .status-late { color: red; font-weight: bold; }
-        .status-ok { color: green; font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f6f9; }
+        
+        /* สไตล์สำหรับกล่อง Dashboard */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .card h3 { margin: 0; font-size: 36px; color: #333; }
+        .card p { margin: 5px 0 0; color: #666; font-size: 16px; }
+        
+        /* สีของแต่ละกล่อง */
+        .card.blue { border-top: 5px solid #007bff; }
+        .card.green { border-top: 5px solid #28a745; }
+        .card.orange { border-top: 5px solid #ffc107; }
+        .card.red { border-top: 5px solid #dc3545; }
+
+        /* ตารางและปุ่ม */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #343a40; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        
+        .btn-main { background-color: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; display: inline-block; }
+        .btn-add { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+        
+        .status-late { color: #dc3545; font-weight: bold; background: #ffe6e6; padding: 2px 8px; border-radius: 4px; }
+        .status-ok { color: #28a745; font-weight: bold; background: #e6ffec; padding: 2px 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <h1>📊 แดชบอร์ดผู้ดูแล: คุณ<%= adminName %></h1>
-    <a href="/logout" style="float:right; color:red;">ออกจากระบบ</a>
-    
-    <div style="background:#f9f9f9; padding:15px; border-radius:5px;">
-        <h3>➕ เพิ่มพนักงานใหม่</h3>
-        <form action="/add-user" method="post">
-            <input type="text" name="username" placeholder="Username (สำหรับล็อกอิน)" required>
-            <input type="text" name="password" placeholder="Password" required>
-            <input type="text" name="name" placeholder="ชื่อ-นามสกุลจริง" required>
-            <button type="submit">บันทึก</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>📊 แดชบอร์ด: คุณ<%= adminName %></h1>
+        <a href="/logout" style="color:red; text-decoration: none;">ออกจากระบบ</a>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="card blue">
+            <h3><%= stats.total %></h3>
+            <p>👥 พนักงานทั้งหมด</p>
+        </div>
+        <div class="card green">
+            <h3><%= stats.present %></h3>
+            <p>✅ มาทำงานวันนี้</p>
+        </div>
+        <div class="card orange">
+            <h3><%= stats.late %></h3>
+            <p>⏰ สาย</p>
+        </div>
+        <div class="card red">
+            <h3><%= stats.absent %></h3>
+            <p>❌ ขาด / ยังไม่มา</p>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <a href="/admin/users" class="btn-main">👥 ดู/ลบ รายชื่อพนักงานทั้งหมด</a>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <h3 style="margin-top: 0;">➕ เพิ่มพนักงานใหม่</h3>
+        <form action="/add-user" method="post" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" name="username" placeholder="Username" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <input type="text" name="password" placeholder="Password" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <input type="text" name="name" placeholder="ชื่อ-สกุล" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1;">
+            <button type="submit" class="btn-add">บันทึก</button>
         </form>
     </div>
 
-    <h3>🕒 ประวัติการเข้างานล่าสุด</h3>
+    <h3>🕒 ประวัติการเข้า-ออกงาน (ล่าสุด)</h3>
     <table>
-        <tr>
-            <th>ชื่อพนักงาน</th>
-            <th>เวลาที่สแกน</th>
-            <th>สถานะ</th>
-        </tr>
-        <% data.forEach(function(row) { %>
+        <thead>
             <tr>
-                <td><%= row.name %></td>
-                <td><%= new Date(row.check_in_time).toLocaleString('th-TH') %></td>
-                <td class="<%= row.status == 'สาย' ? 'status-late' : 'status-ok' %>">
-                    <%= row.status %>
-                </td>
+                <th>วันที่</th>
+                <th>ชื่อพนักงาน</th>
+                <th>เวลาเข้า</th>
+                <th>เวลาออก</th>
+                <th>สถานะรวม</th>
             </tr>
-        <% }); %>
+        </thead>
+        <tbody>
+            <% data.forEach(function(row) { %>
+                <tr>
+                    <td><%= row.date %></td>
+                    <td><%= row.name %></td>
+                    <td><%= row.check_in_time %></td>
+                    <td><%= row.check_out_time || '-' %></td>
+                    <td>
+                        <span class="<%= row.status.includes('สาย') ? 'status-late' : 'status-ok' %>">
+                            <%= row.status %>
+                        </span>
+                    </td>
+                </tr>
+            <% }); %>
+        </tbody>
     </table>
 </body>
 </html>
