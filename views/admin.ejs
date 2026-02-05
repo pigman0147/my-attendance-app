@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .status-late { color: red; font-weight: bold; }
+        .status-ok { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>📊 แดชบอร์ดผู้ดูแล: คุณ<%= adminName %></h1>
+    <a href="/logout" style="float:right; color:red;">ออกจากระบบ</a>
+    
+    <div style="background:#f9f9f9; padding:15px; border-radius:5px;">
+        <h3>➕ เพิ่มพนักงานใหม่</h3>
+        <form action="/add-user" method="post">
+            <input type="text" name="username" placeholder="Username (สำหรับล็อกอิน)" required>
+            <input type="text" name="password" placeholder="Password" required>
+            <input type="text" name="name" placeholder="ชื่อ-นามสกุลจริง" required>
+            <button type="submit">บันทึก</button>
+        </form>
+    </div>
+
+    <h3>🕒 ประวัติการเข้างานล่าสุด</h3>
+    <table>
+        <tr>
+            <th>ชื่อพนักงาน</th>
+            <th>เวลาที่สแกน</th>
+            <th>สถานะ</th>
+        </tr>
+        <% data.forEach(function(row) { %>
+            <tr>
+                <td><%= row.name %></td>
+                <td><%= new Date(row.check_in_time).toLocaleString('th-TH') %></td>
+                <td class="<%= row.status == 'สาย' ? 'status-late' : 'status-ok' %>">
+                    <%= row.status %>
+                </td>
+            </tr>
+        <% }); %>
+    </table>
+</body>
+</html>

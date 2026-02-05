@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Check In</title></head>
+<body style="text-align:center; padding-top:50px; font-family:sans-serif;">
+    <h1>สวัสดีคุณ <%= name %> 👋</h1>
+    
+    <% if (message) { %>
+        <div style="background:#dff0d8; color:green; padding:10px; margin-bottom:20px;">
+            <%= message %>
+        </div>
+    <% } %>
+
+    <form action="/do-checkin" method="post">
+        <button type="submit" style="padding:30px 50px; font-size:24px; background-color:#28a745; color:white; border:none; cursor:pointer; border-radius:10px;">
+            👉 กดปุ่มนี้เพื่อลงเวลาเข้างาน
+        </button>
+    </form>
+    
+    <br><br>
+    <a href="/logout" style="color:#666;">ออกจากระบบ</a>
+</body>
+</html>
