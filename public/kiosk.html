@@ -41,7 +41,7 @@
 
         <script>
             // แก้ตรงนี้เป็น IP เครื่องเรา ถ้าจะให้มือถือสแกนได้ (เช่น 'http://192.168.1.5:3000')
-            const API_URL = "http://localhost:3000";
+            const API_URL = "";
             let qrCodeObj = null;
 
             async function updateQRCode() {
@@ -52,6 +52,7 @@
 
                     // เพื่อความง่ายในตัวอย่างนี้ ผมจะ Gen random ในนี้เลย
                     // (ในระบบจริงควรขอจาก Server เพื่อความปลอดภัย)
+                    // const res = await fetch(`${API_URL}/get-qr-token`);
                     const randomToken = Math.random().toString(36).substring(7);
 
                     const mobileUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/mobile.html?token=${randomToken}`;
