@@ -29,7 +29,7 @@
                 color: #333;
             }
 
-            /* ส่วนค้นหา */
+            /* Search Box */
             .search-container {
                 position: relative;
                 margin: 20px 0;
@@ -48,7 +48,7 @@
                 border-color: #007bff;
             }
 
-            /* รายการชื่อ */
+            /* Results List */
             .results-list {
                 position: absolute;
                 top: 100%;
@@ -97,9 +97,10 @@
                 min-height: 27px;
             }
 
-            /* อนิเมชั่นเครื่องหมายถูก */
+            /* Success Animation */
             .success-animation {
                 display: none;
+                animation: fadeIn 0.5s;
             }
             .checkmark-circle {
                 width: 80px;
@@ -112,6 +113,17 @@
                 justify-content: center;
                 color: white;
                 font-size: 40px;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
         </style>
     </head>
@@ -142,14 +154,25 @@
                 <div class="checkmark-circle">✓</div>
                 <h2 style="color: #28a745">เรียบร้อย!</h2>
                 <p id="successMsg" style="font-size: 18px; color: #555"></p>
-                <p style="color: #999; font-size: 14px; margin-top: 30px">
-                    คุณสามารถปิดหน้านี้ได้เลยครับ
+
+                <hr
+                    style="
+                        margin: 20px 0;
+                        border: 0;
+                        border-top: 1px solid #eee;
+                    "
+                />
+
+                <p style="color: #999; font-size: 14px">บันทึกข้อมูลแล้ว</p>
+                <p style="color: #333; font-weight: bold; font-size: 16px">
+                    ❌ กรุณากดปิดหน้านี้ได้เลยครับ
                 </p>
+
                 <button
-                    onclick="window.close()"
+                    onclick="tryClose()"
                     style="background-color: #6c757d; margin-top: 10px"
                 >
-                    ปิดหน้านี้
+                    ลองกดปิดหน้านี้
                 </button>
             </div>
         </div>
@@ -179,11 +202,9 @@
                     resultsList.style.display = "none";
                     return;
                 }
-
                 const matches = allUsers.filter((user) =>
                     user.name.toLowerCase().includes(searchText),
                 );
-
                 if (matches.length > 0) {
                     matches.forEach((user) => {
                         const div = document.createElement("div");
@@ -241,7 +262,6 @@
                     const data = await res.json();
 
                     if (data.success) {
-                        // ✨ เปลี่ยนหน้าจอเป็น Success ทันที (ไม่ Redirect ไปไหนแล้ว)
                         document.getElementById("formSection").style.display =
                             "none";
                         document.getElementById(
@@ -250,12 +270,8 @@
                         document.getElementById("successMsg").innerText =
                             data.message;
 
-                        // พยายามสั่งปิดหน้าต่างอัตโนมัติ (บาง Browser อาจจะไม่ยอม)
-                        setTimeout(() => {
-                            window.close();
-                            if (typeof WeixinJSBridge !== "undefined")
-                                WeixinJSBridge.call("closeWindow"); // สำหรับ LINE
-                        }, 3000);
+                        // ลองสั่งปิดอัตโนมัติ (เผื่อใช้ LINE Scan)
+                        setTimeout(tryClose, 2000);
                     } else {
                         document.getElementById("msg").innerText =
                             "⚠️ " + data.message;
@@ -267,6 +283,21 @@
                     document.getElementById("msg").innerText = "❌ Error";
                     btn.disabled = false;
                 }
+            }
+
+            // ฟังก์ชันพยายามปิดหน้าต่าง
+            function tryClose() {
+                // 1. ลองปิดสำหรับ LINE App (WeChat/LINE Browser)
+                if (typeof WeixinJSBridge !== "undefined") {
+                    WeixinJSBridge.call("closeWindow");
+                    return;
+                }
+
+                // 2. ลองปิดสำหรับ Browser ทั่วไป
+                window.close();
+
+                // ถ้ายังไม่ปิด (เพราะ Browser บล็อก) ก็ไม่เป็นไร
+                // เพราะเราโชว์ข้อความให้ user ปิดเองแล้ว
             }
         </script>
     </body>

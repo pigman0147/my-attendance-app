@@ -3,38 +3,57 @@ const router = express.Router();
 const db = require("../database");
 
 // ==========================================
-// 🛠️ ฟังก์ชันคำนวณสถานะ (สูตรเต็ม)
+// 🛠️ 0. เตรียม Database (อัปเดตโครงสร้างอัตโนมัติ)
 // ==========================================
-function calculateStatus(checkInTime, checkOutTime) {
-  if (!checkInTime) return "รอเช็คอิน";
+// เพิ่ม Column 'leave_type' (ประเภทการลา)
+db.run("ALTER TABLE attendance ADD COLUMN leave_type TEXT", (err) => {
+  /* ข้ามถ้ามีแล้ว */
+});
+// เพิ่ม Column 'remark' (เหตุผล/หมายเหตุ)
+db.run("ALTER TABLE attendance ADD COLUMN remark TEXT", (err) => {
+  /* ข้ามถ้ามีแล้ว */
+});
+
+// ==========================================
+// 🛠️ 1. ฟังก์ชันคำนวณสถานะ (ฉบับสมบูรณ์)
+// ==========================================
+function calculateStatus(row) {
+  // 1. ถ้ามีข้อมูลการลา ให้คืนค่าประเภทการลาเลย
+  if (row.leave_type) return row.leave_type;
+
+  // 2. ถ้ายังไม่มีเวลาเข้า
+  if (!row.check_in_time) return "ยังไม่เข้างาน";
 
   let inStatus = "ปกติ";
-  // ตัดเวลาเข้าที่ 09:00
-  const [inH, inM] = checkInTime.split(":").map(Number);
+  // 3. เช็คเวลาเข้า (ตัดที่ 09:00)
+  const [inH, inM] = row.check_in_time.split(":").map(Number);
   if (inH > 9 || (inH === 9 && inM > 0)) {
     inStatus = "สาย";
   }
 
-  if (checkOutTime) {
+  // 4. เช็คเวลาออก (ถ้ามี)
+  if (row.check_out_time && row.check_out_time !== "-") {
     let outStatus = "ออกปกติ";
     // ตัดเวลาออกที่ 17:00
-    const [outH, outM] = checkOutTime.split(":").map(Number);
+    const [outH, outM] = row.check_out_time.split(":").map(Number);
     if (outH < 17) {
       outStatus = "ออกก่อน";
     }
     return `${inStatus} / ${outStatus}`;
   }
 
+  // 5. ถ้ายังไม่ออก
   return inStatus;
 }
 
+// Middleware เช็ค Login
 const requireLogin = (req, res, next) => {
   if (!req.session.loggedin) return res.redirect("/");
   next();
 };
 
 // ==========================================
-// 🛣️ Routes ระบบ
+// 🛣️ Routes ระบบ Login / Logout
 // ==========================================
 
 router.get("/", (req, res) => res.render("login", { error: null }));
@@ -65,23 +84,28 @@ router.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
+// ==========================================
+// 👤 USER SECTION (หน้าเช็คอินส่วนตัว)
+// ==========================================
 router.get("/checkin", requireLogin, (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   db.get(
     "SELECT * FROM attendance WHERE user_id = ? AND date = ?",
     [req.session.userId, today],
     (err, row) => {
-      let workState = row
-        ? row.check_out_time
-          ? "FINISHED"
-          : "WORKING"
-        : "WAIT_CHECKIN";
+      let workState = "WAIT_CHECKIN";
+
+      if (row) {
+        if (row.leave_type)
+          workState = "LEAVE"; // ลา
+        else if (row.check_out_time && row.check_out_time !== "-")
+          workState = "FINISHED"; // ออกแล้ว
+        else workState = "WORKING"; // ทำงานอยู่
+      }
+
       let recordData = row || {};
-      if (row)
-        recordData.status = calculateStatus(
-          row.check_in_time,
-          row.check_out_time,
-        );
+      if (row) recordData.status = calculateStatus(row);
+
       res.render("checkin", {
         name: req.session.name,
         workState,
@@ -92,41 +116,123 @@ router.get("/checkin", requireLogin, (req, res) => {
 });
 
 // ==========================================
-// 👮‍♂️ ADMIN DASHBOARD
+// 👮‍♂️ ADMIN SECTION (Dashboard)
 // ==========================================
 
+// 1. หน้า Dashboard หลัก (สรุปสถานะวันนี้)
 router.get("/admin", requireLogin, (req, res) => {
   if (req.session.role !== "admin") return res.redirect("/checkin");
 
+  const today = new Date().toISOString().split("T")[0];
+
+  // ดึง User ทุกคน + Join กับตารางเวลาของ "วันนี้"
   const query = `
-        SELECT a.*, u.name
-        FROM attendance a
-        JOIN users u ON a.user_id = u.id
-        ORDER BY a.date DESC, a.check_in_time DESC
+        SELECT u.id, u.name, u.username,
+               a.check_in_time, a.check_out_time, a.leave_type, a.remark
+        FROM users u
+        LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
+        WHERE u.role != 'admin'
+        ORDER BY
+            CASE WHEN a.check_in_time IS NULL THEN 0 ELSE 1 END,
+            u.name ASC
     `;
 
-  db.all("SELECT id FROM users", (errUsers, users) => {
-    db.all(query, (err, rows) => {
-      if (err) rows = [];
-      const processedRows = rows.map((row) => ({
-        ...row,
-        status: calculateStatus(row.check_in_time, row.check_out_time),
-      }));
+  db.all(query, [today], (err, rows) => {
+    if (err) rows = [];
 
-      res.render("admin", {
-        data: processedRows,
-        userCount: users.length,
-        name: req.session.name,
-      });
+    const processedRows = rows.map((row) => ({
+      ...row,
+      status: calculateStatus(row),
+    }));
+
+    res.render("admin", {
+      data: processedRows,
+      name: req.session.name,
     });
   });
 });
 
-// 🟢 [เพิ่มใหม่] หน้าดูประวัติย้อนหลัง (History)
+// 2. ปุ่มลัดหน้า Dashboard: กดปุ่มลาเล็กๆ
+router.post("/admin/mark-leave", requireLogin, (req, res) => {
+  if (req.session.role !== "admin") return res.status(403).send("Forbidden");
+  const { userId, type } = req.body;
+  const today = new Date().toISOString().split("T")[0];
+
+  db.run(
+    "DELETE FROM attendance WHERE user_id = ? AND date = ?",
+    [userId, today],
+    () => {
+      db.run(
+        "INSERT INTO attendance (user_id, date, check_in_time, check_out_time, leave_type) VALUES (?, ?, '-', '-', ?)",
+        [userId, today, type],
+        (err) => res.redirect("/admin"),
+      );
+    },
+  );
+});
+
+// ==========================================
+// 📝 หน้าจัดการพิเศษ (Manage & Reason)
+// ==========================================
+
+// 3. หน้าตารางลงรายละเอียด (Manage Page)
+router.get("/admin/manage", requireLogin, (req, res) => {
+  if (req.session.role !== "admin") return res.redirect("/");
+  const selectedDate = req.query.date || new Date().toISOString().split("T")[0];
+
+  const query = `
+        SELECT u.id, u.name,
+               a.check_in_time, a.check_out_time, a.leave_type, a.remark
+        FROM users u
+        LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
+        WHERE u.role != 'admin'
+        ORDER BY u.name ASC
+    `;
+
+  db.all(query, [selectedDate], (err, rows) => {
+    res.render("manage", {
+      data: rows || [],
+      date: selectedDate,
+      name: req.session.name,
+    });
+  });
+});
+
+// 4. API บันทึกข้อมูลจากหน้า Manage (แก้เวลา/ลงเหตุผล)
+router.post("/admin/update-status", requireLogin, (req, res) => {
+  if (req.session.role !== "admin") return res.status(403).send("Forbidden");
+
+  const { userId, date, status, remark, checkIn, checkOut } = req.body;
+
+  let leaveType = null;
+  // ถ้าเลือกสถานะที่เป็นการลา ให้บันทึกค่าลง leaveType
+  if (["ลาป่วย", "ลากิจ", "ขาดงาน", "พักร้อน", "อื่นๆ"].includes(status)) {
+    leaveType = status;
+  }
+
+  db.run(
+    "DELETE FROM attendance WHERE user_id = ? AND date = ?",
+    [userId, date],
+    () => {
+      db.run(
+        `INSERT INTO attendance (user_id, date, check_in_time, check_out_time, leave_type, remark)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+        [userId, date, checkIn || null, checkOut || null, leaveType, remark],
+        (err) => {
+          res.redirect(`/admin/manage?date=${date}`);
+        },
+      );
+    },
+  );
+});
+
+// ==========================================
+// 📅 History & User Management
+// ==========================================
+
+// 5. ประวัติย้อนหลัง (History)
 router.get("/admin/history", requireLogin, (req, res) => {
   if (req.session.role !== "admin") return res.redirect("/");
-
-  // รับค่าวันที่จาก URL (ถ้าไม่มีใช้วันปัจจุบัน)
   const selectedDate = req.query.date || new Date().toISOString().split("T")[0];
 
   const query = `
@@ -141,18 +247,17 @@ router.get("/admin/history", requireLogin, (req, res) => {
     if (err) rows = [];
     const processedRows = rows.map((row) => ({
       ...row,
-      status: calculateStatus(row.check_in_time, row.check_out_time),
+      status: calculateStatus(row),
     }));
-
     res.render("history", {
       data: processedRows,
-      date: selectedDate, // ส่งวันที่กลับไปให้หน้าเว็บแสดง
+      date: selectedDate,
       name: req.session.name,
     });
   });
 });
 
-// หน้ารายชื่อพนักงาน
+// 6. จัดการพนักงาน (Users)
 router.get("/users", requireLogin, (req, res) => {
   if (req.session.role !== "admin") return res.redirect("/");
   db.all("SELECT * FROM users ORDER BY role ASC, name ASC", (err, users) => {
@@ -181,20 +286,28 @@ router.get("/admin/delete-user/:id", requireLogin, (req, res) => {
   );
 });
 
-// API
-router.get("/api/get-users", (req, res) =>
+// ==========================================
+// 📱 API Mobile / QR Code / Autocomplete
+// ==========================================
+
+router.get("/api/get-users", (req, res) => {
   db.all(
     "SELECT username, name FROM users WHERE role != 'admin' ORDER BY name ASC",
-    (err, rows) => res.json(rows || []),
-  ),
-);
+    (err, rows) => {
+      res.json(rows || []);
+    },
+  );
+});
+
 router.post("/api/qr-checkin", (req, res) => {
   const { username } = req.body;
   db.get("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
-    if (!user) return res.json({ success: false, message: "ไม่พบชื่อ" });
+    if (!user) return res.json({ success: false, message: "ไม่พบชื่อพนักงาน" });
+
     const now = new Date();
     const time = now.toLocaleTimeString("th-TH", { hour12: false });
     const date = now.toISOString().split("T")[0];
+
     db.get(
       "SELECT * FROM attendance WHERE user_id = ? AND date = ?",
       [user.id, date],
@@ -203,26 +316,31 @@ router.post("/api/qr-checkin", (req, res) => {
           db.run(
             "INSERT INTO attendance (user_id, check_in_time, date) VALUES (?, ?, ?)",
             [user.id, time, date],
-            () =>
+            (err) => {
               res.json({
                 success: true,
-                message: `☀️ สวัสดี ${user.name}`,
-                redirect: "/checkin",
-              }),
+                message: `☀️ สวัสดี ${user.name} (เข้างานสำเร็จ)`,
+              });
+            },
           );
-        } else if (!row.check_out_time) {
+        } else if (row.leave_type) {
+          res.json({
+            success: false,
+            message: `วันนี้คุณมีสถานะ: ${row.leave_type} ครับ`,
+          });
+        } else if (!row.check_out_time || row.check_out_time === "-") {
           db.run(
             "UPDATE attendance SET check_out_time = ? WHERE id = ?",
             [time, row.id],
-            () =>
+            (err) => {
               res.json({
                 success: true,
-                message: `🌙 กลับบ้านดีๆ ${user.name}`,
-                redirect: "/checkin",
-              }),
+                message: `🌙 กลับบ้านดีๆ ${user.name} (ออกงานสำเร็จ)`,
+              });
+            },
           );
         } else {
-          res.json({ success: false, message: "ลงครบแล้ว" });
+          res.json({ success: false, message: "วันนี้คุณลงเวลาครบแล้วครับ" });
         }
       },
     );
