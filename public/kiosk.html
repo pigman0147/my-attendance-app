@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="th">
+    <head>
+        <meta charset="UTF-8" />
+        <title>จุดลงเวลาพนักงาน</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <style>
+            body {
+                font-family: sans-serif;
+                text-align: center;
+                margin-top: 50px;
+                background-color: #f4f4f4;
+            }
+            .container {
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                display: inline-block;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            }
+            #qrcode {
+                margin: 20px auto;
+                display: flex;
+                justify-content: center;
+            }
+            h1 {
+                color: #333;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="container">
+            <h1>สแกนเพื่อลงเวลาเข้างาน</h1>
+            <div id="qrcode"></div>
+            <p>QR Code จะเปลี่ยนทุก 30 นาที</p>
+            <p style="font-size: 0.8em; color: #999" id="status">
+                กำลังโหลด...
+            </p>
+        </div>
+
+        <script>
+            // แก้ตรงนี้เป็น IP เครื่องเรา ถ้าจะให้มือถือสแกนได้ (เช่น 'http://192.168.1.5:3000')
+            const API_URL = "";
+            let qrCodeObj = null;
+
+            async function updateQRCode() {
+                try {
+                    // ขอ Token ใหม่ (คุณอาจต้องสร้าง route /get-qr-token เพิ่มถ้ายังไม่มี)
+                    // แต่ถ้าใช้แบบ Fixed URL ชั่วคราวก็สามารถ generate random string ตรงนี้ได้
+                    // สมมติว่ายิงไปขอ Token จาก Server
+
+                    // เพื่อความง่ายในตัวอย่างนี้ ผมจะ Gen random ในนี้เลย
+                    // (ในระบบจริงควรขอจาก Server เพื่อความปลอดภัย)
+                    // const res = await fetch(`${API_URL}/get-qr-token`);
+                    const randomToken = Math.random().toString(36).substring(7);
+
+                    const mobileUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/mobile.html?token=${randomToken}`;
+
+                    const container = document.getElementById("qrcode");
+                    container.innerHTML = "";
+                    qrCodeObj = new QRCode(container, {
+                        text: mobileUrl,
+                        width: 256,
+                        height: 256,
+                    });
+
+                    document.getElementById("status").innerText =
+                        "อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
+                } catch (err) {
+                    console.error("Error generating QR", err);
+                }
+            }
+
+            updateQRCode();
+
+            // ตั้งเวลา 30 นาที (30 * 60 * 1000 = 1,800,000)
+            setInterval(updateQRCode, 1800000);
+        </script>
+    </body>
+</html>
